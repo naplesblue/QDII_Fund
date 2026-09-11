@@ -18,7 +18,18 @@ trap 'rm -rf "$test_data"' EXIT
 previous=$(readlink "$base/current" || true)
 ln -s "$release" "$base/current.next"
 mv -Tf "$base/current.next" "$base/current"
-if systemctl restart fund-atlas && sleep 2 && curl --fail --silent http://127.0.0.1:8765/api/status >/dev/null; then
+ready() {
+    attempt=0
+    while [ "$attempt" -lt 30 ]; do
+        if curl --fail --silent --max-time 2 http://127.0.0.1:8765/api/status >/dev/null; then
+            return 0
+        fi
+        attempt=$((attempt + 1))
+        sleep 1
+    done
+    return 1
+}
+if systemctl restart fund-atlas && ready; then
     printf '%s\n' "Active release: $resolved"
 else
     echo 'Health check failed; restoring previous code release.' >&2
