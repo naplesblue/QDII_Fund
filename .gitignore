@@ -8,3 +8,5 @@ web/data.json
 *.pem
 *.key
 .venv/
+.playwright-cli/
+output/

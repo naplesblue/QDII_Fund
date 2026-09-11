@@ -1,6 +1,8 @@
 # 远见 · 海外基金筛选
 
-本地 HTML 网页，使用已有 735 个 QDII / 海外指数候选份额与公开数据。Python 3 + curl，无第三方运行依赖。
+在线地址：[fund.naplesblue.cn](https://fund.naplesblue.cn)。
+
+HTML 基金筛选网页，使用已有 735 个 QDII / 海外指数候选份额与公开数据。Python 3 + curl，无第三方运行依赖。
 
 ## 打开
 
