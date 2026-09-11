@@ -1,0 +1,25 @@
+[Unit]
+Description=Fund Atlas shared fund screener
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=fund-atlas
+Group=fund-atlas
+WorkingDirectory=/opt/fund-atlas/current
+Environment=PYTHONUNBUFFERED=1
+Environment=FUND_DATA_DIR=/var/lib/fund-atlas
+Environment=FUND_ALLOWED_ORIGINS=https://fund.naplesblue.cn,http://fund.naplesblue.cn
+ExecStart=/usr/bin/python3 -m fund_atlas
+Restart=on-failure
+RestartSec=5
+StateDirectory=fund-atlas
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/fund-atlas
+
+[Install]
+WantedBy=multi-user.target

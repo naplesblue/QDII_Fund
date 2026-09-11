@@ -1,0 +1,16 @@
+# Merge this server/location configuration with the host's existing TLS configuration.
+# Do not replace existing sites or TLS certificates blindly.
+server {
+    listen 80;
+    server_name fund.naplesblue.cn;
+    client_max_body_size 2k;
+    location / {
+        proxy_pass http://127.0.0.1:8765;
+        proxy_set_header Host $host;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_read_timeout 90s;
+        proxy_buffering off;
+        proxy_cache off;
+    }
+}
