@@ -1,10 +1,10 @@
 # Project State
 Updated: 2026-09-11 Asia/Shanghai
-Status: verifying
+Status: complete
 ## Goal
 Organize and document the project, push to naplesblue/QDII_Fund, deploy a Git release on fund.naplesblue.cn.
 ## Current phase
-verification
+handoff
 ## Completed
 - Pushed public GitHub repository naplesblue/QDII_Fund; VPS cloned it and activated a pinned Git release.
 - Dedicated systemd service enabled, isolated Nginx site installed, HTTPS issued and renewal timer confirmed.
@@ -20,10 +20,11 @@ verification
 - Restructured code: 21 tests passed; compileall and JavaScript syntax check passed.
 - VPS: 21 tests passed; nginx -t passed; HTTPS status/data endpoints passed (735 shares).
 - Production NAV retry 008971 returned cached=true, preserving 14:15:57 timestamp.
-- Browser rendered 15 table rows without horizontal page overflow; only initial favicon 404 found and fixed.
+- Browser rendered 15 rows without horizontal overflow; searching 008971 returned one matching row with NAV 6.2248.
+- Final app release 37227fed4b2608d63aacd4442f5978739318d1d8 is active; favicon returns HTTPS 200.
 - Initial 2-second readiness check was too short for 9-second cache bootstrap; fixed to poll up to 30 attempts.
 ## Next action
-Push final production UI copy/favicon, activate release and verify repository cleanliness.
+None — complete. Future updates: push tested commit, fetch on VPS, run deploy/release.sh with that commit.
 ## Blockers and risks
 - Trading calendar covers 2026 only; extend before 2027.
 - Public upstream availability is not guaranteed; failures use cooldown.
