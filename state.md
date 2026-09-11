@@ -21,7 +21,9 @@ handoff
 - VPS: 21 tests passed; nginx -t passed; HTTPS status/data endpoints passed (735 shares).
 - Production NAV retry 008971 returned cached=true, preserving 14:15:57 timestamp.
 - Browser rendered 15 rows without horizontal overflow; searching 008971 returned one matching row with NAV 6.2248.
-- Final app release 37227fed4b2608d63aacd4442f5978739318d1d8 is active; favicon returns HTTPS 200.
+- Production uses /opt/fund-atlas/current pointing to a pinned Git release; favicon returns HTTPS 200.
+- Desktop header uses main content edges, groups subtitle with brand, and keeps refresh aligned right.
+- Header browser preview at 1920px: brand/main left edges both 206.39px; no horizontal overflow.
 - Initial 2-second readiness check was too short for 9-second cache bootstrap; fixed to poll up to 30 attempts.
 ## Next action
 None — complete. Future updates: push tested commit, fetch on VPS, run deploy/release.sh with that commit.
