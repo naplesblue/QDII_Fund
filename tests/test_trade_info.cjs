@@ -1,0 +1,13 @@
+const assert=require('node:assert/strict');
+const {amount,info,compare}=require('../web/trade-info.js');
+const fund=(code,quota,currency='RMB')=>({code,quota,currency,channel:'both',purchase_status:'限大额',field_states:{quota:{status:'ok'}}});
+const a=fund('1',100),b=fund('2',20),usd=fund('3',1,'USD'),paused={...fund('4',999),purchase_status:'暂停申购'},failed={...a,code:'5',field_states:{quota:{status:'error'}}};
+assert.equal(info(a).otc,'¥100/日');assert.equal(amount(paused),null);assert.equal(amount(failed),null);
+assert.deepEqual([usd,paused,a,b,failed].sort((x,y)=>compare(x,y,'asc')).map(x=>x.code),['2','1','3','4','5']);
+assert.deepEqual([usd,paused,a,b,failed].sort((x,y)=>compare(x,y,'desc')).map(x=>x.code),['1','2','3','4','5']);
+assert.equal(info(paused).primary,'待核验');assert.equal(info(paused).trading,'已上市');
+assert.equal(info({...a,channel:'exchange'}).otc,'不适用');
+assert.equal(info({...a,channel:'otc'}).primary,'不适用');
+assert.equal(info({...a,channel:'otc'}).trading,'未上市');
+assert.equal(info({...a,channel:'unknown'}).trading,'待核验');
+console.log('Trade display and numeric/currency sorting checks passed');

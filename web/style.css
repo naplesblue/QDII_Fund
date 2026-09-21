@@ -77,3 +77,13 @@ td small{font-size:11px;line-height:1.45;margin-top:4px}td small.same-date{displ
 
 .fund-meta{flex-wrap:wrap;row-gap:5px}.channel-tag{background:#edf0f2;color:#526575}.channel-note{font-size:13px;line-height:1.7;color:var(--muted)}
 .column-sort[data-sort="quota"] .sort-main{white-space:normal;text-align:right;line-height:1.4}
+
+/* Three distinct routes, with a numeric OTC amount kept separately for sorting. */
+.trade-info{display:grid;gap:5px;text-align:left;width:100%;font-size:12px;line-height:1.5}
+.trade-line{display:flex;justify-content:space-between;align-items:center;gap:5px;flex-wrap:wrap}
+.trade-line>span{font-size:11px;color:var(--muted);white-space:nowrap}
+.trade-line>strong{font-size:12px;font-weight:500;font-variant-numeric:tabular-nums}
+.trade-muted{color:var(--muted)}.trade-paused{color:var(--orange)}
+.trade-line .field-missing{flex-direction:row;align-items:center;gap:3px}
+@media(min-width:1101px){.table-scroll th:nth-child(5){width:16%}.fund-col{width:22%}.table-scroll th:nth-child(3){width:10%}.table-scroll th:nth-child(4){width:11%}}
+.metric .trade-info{max-width:250px}

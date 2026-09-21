@@ -62,6 +62,7 @@ work/           本地运行数据、缓存和研究输出（不提交）
 python3 -m unittest discover -s tests -v
 python3 -m compileall -q fund_atlas
 node --check web/app.js
+node tests/test_trade_info.cjs
 ```
 
 首次启动从 `data/qdii_candidates.csv` 建立候选列表。点击刷新获取数据；首次全量获取可能需要数分钟。`FUND_DATA_DIR` 指定运行目录，`FUND_ALLOWED_ORIGINS` 为逗号分隔的允许来源。收藏存于各自浏览器的 localStorage，切换域名或浏览器不会迁移收藏。
@@ -74,4 +75,4 @@ API 探针：`python3 scripts/test_qdii_api.py`；离线分析：`python3 script
 
 渠道按份额代码、名称和上市标记初分，尚非交易所完整上市资格核验。上市 LOF 归入“两者均可”，同时出现在场内和场外筛选中；LOF 的非上市 C 类份额不会因名称含 LOF 被归入场内。暂停申购不改变渠道归类，是否当前开放仍看申购状态和公告。证据不足保留“渠道待核验”。
 
-表格“场外申购限额”仅表示来源平台的场外每日限额，ETF 显示不适用。ETF 一级市场清单尚未接入生产页，历史可行性实测见 [研究记录](docs/primary-subscription-research.md)；不能把该历史样本当作当前额度。详情中说明一级申赎门槛与场外额度的区别。
+表格“申购与交易”固定三行：场外申购、场内申购、场内交易。场外金额为来源平台日限额；场内申购未取得独立依据时显示待核验，不能由场外暂停推断；场内交易显示上市情况，不承诺实时未停牌。点击表头按场外日限额数值升降序，人民币与美元分组，暂停、缺失及不适用置后。ETF 一级市场清单尚未接入生产页，历史可行性实测见 [研究记录](docs/primary-subscription-research.md)；不能把该历史样本当作当前额度。详情中说明一级申赎门槛与场外额度的区别。

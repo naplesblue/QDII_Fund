@@ -1,11 +1,13 @@
 # Project State
 Updated: 2026-09-21 Asia/Shanghai
-Status: complete
+Status: verifying
 ## Goal
-Add trading-channel filters and labels, clarify OTC limits, verify and deploy.
+Display three distinct subscription/trading routes in one column, retain numeric OTC sorting and deploy.
 ## Current phase
-handoff
+verification
 ## Completed
+- Replaced quota cell with three labeled rows: OTC subscription, exchange subscription, exchange trading.
+- Numeric OTC sort keeps missing/paused values last, separates RMB/USD and ignores display text.
 - Added conservative share-level channel classification and overlapping exchange/OTC filters for listed LOFs.
 - Renamed quota column/filter/detail/CSV to OTC subscription limits; exchange ETF quota displays not applicable.
 - Added channel badges and detail explanation; no historical PCF values added to live page.
@@ -24,6 +26,8 @@ handoff
 - docs/primary-subscription-research.md — official endpoint feasibility and exact sample limits; no application changes this turn.
 - fund_atlas/, tests/, scripts/, data/, docs/, README.md, deploy/ — organized code and documentation.
 ## Verification
+- Node trade-info checks passed for ascending/descending currency groups, missing/paused values and channel display.
+- 22 Python tests and JS syntax passed; desktop screenshot inspected; mobile 390px no overflow, three rows present.
 - VPS release c0aaf0e passed 22 tests and health check; live data includes channels (161128 both, 008971 OTC, 159696 exchange, 012868 OTC).
 - 22 Python tests passed, including listed LOF versus nonlisted C share and paused subscription cases.
 - JavaScript syntax passed; browser LOF-only filter returned 15 matching rows, no console errors.
@@ -37,7 +41,7 @@ handoff
 - Header browser preview at 1920px: brand/main left edges both 206.39px; no horizontal overflow.
 - Initial 2-second readiness check was too short for 9-second cache bootstrap; fixed to poll up to 30 attempts.
 ## Next action
-None — channel filters deployed in app release c0aaf0e; live API sample classifications verified.
+Deploy verified three-route display and verify live static assets.
 ## Blockers and risks
 - Four ETF samples are not full-market coverage; LOF channel scope and missing/zero semantics require further verification.
 - Trading calendar covers 2026 only; extend before 2027.
