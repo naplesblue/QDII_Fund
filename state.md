@@ -1,11 +1,17 @@
 # Project State
-Updated: 2026-09-11 Asia/Shanghai
-Status: complete
+Updated: 2026-09-21 Asia/Shanghai
+Status: verifying
 ## Goal
-Organize and document the project, push to naplesblue/QDII_Fund, deploy a Git release on fund.naplesblue.cn.
+Add trading-channel filters and labels, clarify OTC limits, verify and deploy.
 ## Current phase
-handoff
+verification
 ## Completed
+- Added conservative share-level channel classification and overlapping exchange/OTC filters for listed LOFs.
+- Renamed quota column/filter/detail/CSV to OTC subscription limits; exchange ETF quota displays not applicable.
+- Added channel badges and detail explanation; no historical PCF values added to live page.
+- Read-only VPS probe obtained dated 2026-09-11 PCFs for 513100, 513390, 513110 and 159696.
+- LOF 161128 official status lacks explicit exchange-channel scope; exchange limit remains unverified.
+- Findings and API parameters saved in docs/primary-subscription-research.md; raw responses in work/primary-probe/.
 - Pushed public GitHub repository naplesblue/QDII_Fund; VPS cloned it and activated a pinned Git release.
 - Dedicated systemd service enabled, isolated Nginx site installed, HTTPS issued and renewal timer confirmed.
 - Migrated 735-share snapshot with original timestamps; runtime data remains outside Git.
@@ -15,8 +21,12 @@ handoff
 - Preserve public repository visibility chosen by user; exclude runtime snapshots, cache and credentials.
 - Use dedicated service account, immutable release directories and separate /var/lib/fund-atlas state.
 ## Changed files
+- docs/primary-subscription-research.md — official endpoint feasibility and exact sample limits; no application changes this turn.
 - fund_atlas/, tests/, scripts/, data/, docs/, README.md, deploy/ — organized code and documentation.
 ## Verification
+- 22 Python tests passed, including listed LOF versus nonlisted C share and paused subscription cases.
+- JavaScript syntax passed; browser LOF-only filter returned 15 matching rows, no console errors.
+- Desktop 1440px and mobile 390px layouts checked; mobile has no horizontal overflow.
 - Restructured code: 21 tests passed; compileall and JavaScript syntax check passed.
 - VPS: 21 tests passed; nginx -t passed; HTTPS status/data endpoints passed (735 shares).
 - Production NAV retry 008971 returned cached=true, preserving 14:15:57 timestamp.
@@ -26,7 +36,8 @@ handoff
 - Header browser preview at 1920px: brand/main left edges both 206.39px; no horizontal overflow.
 - Initial 2-second readiness check was too short for 9-second cache bootstrap; fixed to poll up to 30 attempts.
 ## Next action
-None — complete. Future updates: push tested commit, fetch on VPS, run deploy/release.sh with that commit.
+Push and deploy channel UI, then verify live endpoints.
 ## Blockers and risks
+- Four ETF samples are not full-market coverage; LOF channel scope and missing/zero semantics require further verification.
 - Trading calendar covers 2026 only; extend before 2027.
 - Public upstream availability is not guaranteed; failures use cooldown.

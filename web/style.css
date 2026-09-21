@@ -74,3 +74,6 @@ td small{font-size:11px;line-height:1.45;margin-top:4px}td small.same-date{displ
  .header-note{margin-left:0;padding-left:20px;border-left:1px solid var(--line);font-size:13px;line-height:24px}
  header>.primary{margin-left:auto}
 }
+
+.fund-meta{flex-wrap:wrap;row-gap:5px}.channel-tag{background:#edf0f2;color:#526575}.channel-note{font-size:13px;line-height:1.7;color:var(--muted)}
+.column-sort[data-sort="quota"] .sort-main{white-space:normal;text-align:right;line-height:1.4}

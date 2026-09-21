@@ -2,6 +2,7 @@
 """Local read-only fund screener. Run python3 -m fund_atlas; refresh via UI or --refresh."""
 import concurrent.futures, csv, io, os, datetime as dt, html, json, math, pathlib, re, subprocess, threading, time, urllib.parse
 from http.server import ThreadingHTTPServer, SimpleHTTPRequestHandler
+from .channels import classify_channel, LABELS as CHANNEL_LABELS
 from .shared_cache import SharedCache, CacheFailure, TTLS, quote_session
 ROOT=pathlib.Path(__file__).resolve().parent.parent
 RUNTIME=pathlib.Path(os.environ.get('FUND_DATA_DIR',str(ROOT/'work/runtime')))
@@ -231,7 +232,10 @@ def enrich(row,previous=None):
 
 def atomic(data):
  tmp=DATA.with_suffix('.tmp'); tmp.write_text(json.dumps(data,ensure_ascii=False,separators=(',',':'))); tmp.replace(DATA)
-def load(): return json.loads(DATA.read_text()) if DATA.exists() else {'funds':[]}
+def load():
+ data=json.loads(DATA.read_text()) if DATA.exists() else {'funds':[]}
+ for f in data['funds']:f['channel']=classify_channel(f)
+ return data
 def parse_rows(rows,stamp):
  result=[]
  for x in rows:
@@ -431,10 +435,10 @@ class Handler(SimpleHTTPRequestHandler):
  def do_GET(self):
   if self.path.startswith('/api/export?'):
    params=urllib.parse.parse_qs(urllib.parse.urlsplit(self.path).query); codes=set(params.get('codes',[''])[0].split(','));years=params.get('years',['3'])[0]
-   out=io.StringIO();w=csv.writer(out);w.writerow(['代码','名称','币种','方向初分','分类依据',years+'年年化%',years+'年最大回撤%','基金净值','净值截止日','申购状态','日额度','平台申购费','管理费%','托管费%','销售服务费%','IOPV溢价%','行情日期','额度抓取','指标抓取','更新错误'])
+   out=io.StringIO();w=csv.writer(out);w.writerow(['代码','名称','币种','方向初分','分类依据',years+'年年化%',years+'年最大回撤%','基金净值','净值截止日','交易渠道（初分）','场外申购状态','场外日申购限额','平台申购费','管理费%','托管费%','销售服务费%','IOPV溢价%','行情日期','额度抓取','指标抓取','更新错误'])
    for f in load()['funds']:
     if f['code'] not in codes: continue
-    values=[f['code'],f['name'],f['currency'],f['category'],f.get('classification_note'),f.get('returns',{}).get(years),f.get('drawdowns',{}).get(years),f.get('nav'),f.get('nav_date'),f.get('purchase_status'),f.get('quota'),f.get('purchase_fee'),*[f.get('fees',{}).get(k) for k in ['management','custody','service']],f.get('premium'),f.get('quote_date'),f.get('purchase_at'),f.get('returns_at'),json.dumps(f.get('field_states',{}),ensure_ascii=False)]
+    values=[f['code'],f['name'],f['currency'],f['category'],f.get('classification_note'),f.get('returns',{}).get(years),f.get('drawdowns',{}).get(years),f.get('nav'),f.get('nav_date'),CHANNEL_LABELS[classify_channel(f)],f.get('purchase_status'),f.get('quota'),f.get('purchase_fee'),*[f.get('fees',{}).get(k) for k in ['management','custody','service']],f.get('premium'),f.get('quote_date'),f.get('purchase_at'),f.get('returns_at'),json.dumps(f.get('field_states',{}),ensure_ascii=False)]
     w.writerow([("'"+v if isinstance(v,str) and v.startswith(('=','+','-','@')) else v) for v in values])
    body=('\ufeff'+out.getvalue()).encode('utf-8');self.send_response(200);self.send_header('Content-Type','text/csv; charset=utf-8');self.send_header('Content-Disposition','attachment; filename="fund-atlas.csv"');self.send_header('Content-Length',str(len(body)));self.end_headers();self.wfile.write(body);return
   if self.path=='/api/status': return self.send_json(STATUS.copy())
