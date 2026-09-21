@@ -1,10 +1,10 @@
 # Project State
 Updated: 2026-09-21 Asia/Shanghai
-Status: verifying
+Status: complete
 ## Goal
 Add trading-channel filters and labels, clarify OTC limits, verify and deploy.
 ## Current phase
-verification
+handoff
 ## Completed
 - Added conservative share-level channel classification and overlapping exchange/OTC filters for listed LOFs.
 - Renamed quota column/filter/detail/CSV to OTC subscription limits; exchange ETF quota displays not applicable.
@@ -24,6 +24,7 @@ verification
 - docs/primary-subscription-research.md — official endpoint feasibility and exact sample limits; no application changes this turn.
 - fund_atlas/, tests/, scripts/, data/, docs/, README.md, deploy/ — organized code and documentation.
 ## Verification
+- VPS release c0aaf0e passed 22 tests and health check; live data includes channels (161128 both, 008971 OTC, 159696 exchange, 012868 OTC).
 - 22 Python tests passed, including listed LOF versus nonlisted C share and paused subscription cases.
 - JavaScript syntax passed; browser LOF-only filter returned 15 matching rows, no console errors.
 - Desktop 1440px and mobile 390px layouts checked; mobile has no horizontal overflow.
@@ -36,7 +37,7 @@ verification
 - Header browser preview at 1920px: brand/main left edges both 206.39px; no horizontal overflow.
 - Initial 2-second readiness check was too short for 9-second cache bootstrap; fixed to poll up to 30 attempts.
 ## Next action
-Push and deploy channel UI, then verify live endpoints.
+None — channel filters deployed in app release c0aaf0e; live API sample classifications verified.
 ## Blockers and risks
 - Four ETF samples are not full-market coverage; LOF channel scope and missing/zero semantics require further verification.
 - Trading calendar covers 2026 only; extend before 2027.
