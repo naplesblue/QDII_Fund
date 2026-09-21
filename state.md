@@ -1,10 +1,10 @@
 # Project State
 Updated: 2026-09-21 Asia/Shanghai
-Status: verifying
+Status: complete
 ## Goal
 Display three distinct subscription/trading routes in one column, retain numeric OTC sorting and deploy.
 ## Current phase
-verification
+handoff
 ## Completed
 - Replaced quota cell with three labeled rows: OTC subscription, exchange subscription, exchange trading.
 - Numeric OTC sort keeps missing/paused values last, separates RMB/USD and ignores display text.
@@ -41,7 +41,7 @@ verification
 - Header browser preview at 1920px: brand/main left edges both 206.39px; no horizontal overflow.
 - Initial 2-second readiness check was too short for 9-second cache bootstrap; fixed to poll up to 30 attempts.
 ## Next action
-Deploy verified three-route display and verify live static assets.
+None — app release a1c537f deployed; HTTPS trade-info.js and API status checks passed.
 ## Blockers and risks
 - Four ETF samples are not full-market coverage; LOF channel scope and missing/zero semantics require further verification.
 - Trading calendar covers 2026 only; extend before 2027.
