@@ -1,10 +1,10 @@
 # Project State
 Updated: 2026-09-23 Asia/Shanghai
-Status: verifying
+Status: complete
 ## Goal
 Collect observed IOPV premiums every five minutes during trading sessions using the shared cache, preserve history and show hover/click charts.
 ## Current phase
-verification
+handoff
 ## Completed
 - Added separate SQLite history with code/quote timestamp deduplication and 7/30/90-day read API.
 - Collector runs in production server, checks every 30s, fetches only when shared 5-minute quote cache expires and no manual job holds lock.
@@ -24,9 +24,11 @@ verification
 - 26 Python tests passed; JS syntax and trade display/sort checks passed.
 - Browser empty state and five isolated chart samples passed: 5 dots / 3 segments across a 30-minute gap.
 - Mobile 390px panel within viewport, no overflow, no browser errors.
-- VPS existing quote timestamps/date/IOPV shape verified; production deployment pending.
+- VPS release c77d7eb deployed; 26 tests passed; systemd enabled and collector.enabled=true.
+- Public HTTPS and local history APIs returned valid empty histories during lunch, as expected; no upstream request attempted off-session.
+- Initial remote DNS failure cleared on retry; both endpoint checks passed.
 ## Next action
-Verify chart states and production collector, then push/deploy and update documentation.
+None — deployed. History begins with valid quotes in the next trading session; no real production samples existed during lunch verification.
 ## Blockers and risks
 - Exchange calendar covers 2026 only; unknown years stop automated collection.
 - Upstream availability, service downtime or long manual refresh can leave gaps; no complete tick-history claim.
