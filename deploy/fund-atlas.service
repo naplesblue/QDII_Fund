@@ -9,6 +9,7 @@ User=fund-atlas
 Group=fund-atlas
 WorkingDirectory=/opt/fund-atlas/current
 Environment=PYTHONUNBUFFERED=1
+Environment=FUND_COLLECT_PREMIUM=1
 Environment=FUND_DATA_DIR=/var/lib/fund-atlas
 Environment=FUND_ALLOWED_ORIGINS=https://fund.naplesblue.cn,http://fund.naplesblue.cn
 ExecStart=/usr/bin/python3 -m fund_atlas

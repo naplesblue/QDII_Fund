@@ -2,6 +2,7 @@
 """Local read-only fund screener. Run python3 -m fund_atlas; refresh via UI or --refresh."""
 import concurrent.futures, csv, io, os, datetime as dt, html, json, math, pathlib, re, subprocess, threading, time, urllib.parse
 from http.server import ThreadingHTTPServer, SimpleHTTPRequestHandler
+from .premium_history import PremiumHistory
 from .channels import classify_channel, LABELS as CHANNEL_LABELS
 from .shared_cache import SharedCache, CacheFailure, TTLS, quote_session
 ROOT=pathlib.Path(__file__).resolve().parent.parent
@@ -10,6 +11,8 @@ RUNTIME.mkdir(parents=True,exist_ok=True)
 CACHE=RUNTIME/'evidence'; CACHE.mkdir(parents=True,exist_ok=True)
 DATA=RUNTIME/'data.json'
 SOURCE_CACHE=SharedCache(RUNTIME/'cache')
+PREMIUM_HISTORY=PremiumHistory(RUNTIME/'premium-history.sqlite3')
+COLLECTOR={'enabled':os.environ.get('FUND_COLLECT_PREMIUM')=='1','last_attempt':None,'last_success':None,'error':None,'last_archived':None,'history_error':None}
 ALLOWED_ORIGINS=set(os.environ.get('FUND_ALLOWED_ORIGINS','http://127.0.0.1:8765,http://localhost:8765').split(','))
 LOCK=threading.Lock()
 STATUS={'running':False,'done':0,'total':0,'errors':0,'message':'尚未刷新'}
@@ -271,8 +274,36 @@ def quotes(batch):
     f.update(premium=round((price/iopv-1)*100,2),price=price,iopv=iopv,quote_at=cache_stamp(meta),quote_date=q.get('f297'),quote_timestamp=q.get('f124'));finish(f,'premium')
    else:state(f,'premium','missing','来源未提供有效价格 / IOPV')
    mark_source(f,'premium',meta)
+  if not meta.get('cached'):
+   try:
+    added=PREMIUM_HISTORY.append(batch,meta['checked_at']);COLLECTOR['history_error']=None
+    if added:COLLECTOR['last_archived']=now()
+   except Exception as exc:
+    COLLECTOR['history_error']=str(exc);print('Premium history write failed: '+str(exc),flush=True)
  except Exception as e:
   for f in batch:fail_field(f,'premium',e)
+
+def collect_premiums():
+ # Manual jobs own the same lock; never overwrite their in-progress dataset.
+ if not quote_session(time.time())[1] or not LOCK.acquire(blocking=False):return False
+ try:
+  if SOURCE_CACHE.peek('quotes'):return False
+  COLLECTOR.update(last_attempt=now(),error=None)
+  data=load();batch=[f for f in data['funds'] if f.get('listed')]
+  if not batch:return False
+  quotes(batch);summarize(data);atomic(data)
+  record=SOURCE_CACHE.read('quotes') or {}
+  if record.get('error'):COLLECTOR['error']=record['error']
+  else:COLLECTOR['last_success']=now()
+  return True
+ finally:LOCK.release()
+
+def premium_collector(stop):
+ while not stop.is_set():
+  try:collect_premiums()
+  except Exception as exc:
+   COLLECTOR['error']=str(exc);print('Premium collector: '+str(exc),flush=True)
+  stop.wait(30)
 
 def summarize(data):
  states=[v for f in data['funds'] for v in f.get('field_states',{}).values()]
@@ -433,6 +464,13 @@ class Handler(SimpleHTTPRequestHandler):
  def send_json(self,x,status=200):
   body=json.dumps(x,ensure_ascii=False).encode();self.send_response(status);self.send_header('Content-Type','application/json; charset=utf-8');self.send_header('Cache-Control','no-store');self.end_headers();self.wfile.write(body)
  def do_GET(self):
+  if urllib.parse.urlsplit(self.path).path=='/api/premium-history':
+   params=urllib.parse.parse_qs(urllib.parse.urlsplit(self.path).query)
+   code=params.get('code',[''])[0];days=params.get('days',['30'])[0]
+   if not re.fullmatch(r'[0-9]{6}',code) or days not in ('7','30','90'):
+    return self.send_json({'error':'无效基金代码或区间'},400)
+   points=PREMIUM_HISTORY.read(code,int(days),time.time())
+   return self.send_json({'code':code,'days':int(days),'points':points,'collector':COLLECTOR.copy(),'basis':'成交价 / IOPV - 1；来源可能延迟，采样记录非完整分时行情'})
   if self.path.startswith('/api/export?'):
    params=urllib.parse.parse_qs(urllib.parse.urlsplit(self.path).query); codes=set(params.get('codes',[''])[0].split(','));years=params.get('years',['3'])[0]
    out=io.StringIO();w=csv.writer(out);w.writerow(['代码','名称','币种','方向初分','分类依据',years+'年年化%',years+'年最大回撤%','基金净值','净值截止日','交易渠道（初分）','场外申购状态','场外日申购限额','平台申购费','管理费%','托管费%','销售服务费%','IOPV溢价%','行情日期','额度抓取','指标抓取','更新错误'])
@@ -441,7 +479,7 @@ class Handler(SimpleHTTPRequestHandler):
     values=[f['code'],f['name'],f['currency'],f['category'],f.get('classification_note'),f.get('returns',{}).get(years),f.get('drawdowns',{}).get(years),f.get('nav'),f.get('nav_date'),CHANNEL_LABELS[classify_channel(f)],f.get('purchase_status'),f.get('quota'),f.get('purchase_fee'),*[f.get('fees',{}).get(k) for k in ['management','custody','service']],f.get('premium'),f.get('quote_date'),f.get('purchase_at'),f.get('returns_at'),json.dumps(f.get('field_states',{}),ensure_ascii=False)]
     w.writerow([("'"+v if isinstance(v,str) and v.startswith(('=','+','-','@')) else v) for v in values])
    body=('\ufeff'+out.getvalue()).encode('utf-8');self.send_response(200);self.send_header('Content-Type','text/csv; charset=utf-8');self.send_header('Content-Disposition','attachment; filename="fund-atlas.csv"');self.send_header('Content-Length',str(len(body)));self.end_headers();self.wfile.write(body);return
-  if self.path=='/api/status': return self.send_json(STATUS.copy())
+  if self.path=='/api/status': return self.send_json(dict(STATUS,collector=COLLECTOR.copy()))
   if self.path in ('/api/data','/data.json'): return self.send_json(load())
   return super().do_GET()
  def do_POST(self):
@@ -470,4 +508,8 @@ def main():
  if args.refresh:
   refresh(args.limit);print(json.dumps(STATUS,ensure_ascii=False))
  else:
-  print('Fund Atlas: http://127.0.0.1:8765',flush=True);ThreadingHTTPServer(('127.0.0.1',8765),Handler).serve_forever()
+  stop=threading.Event()
+  if COLLECTOR['enabled']:threading.Thread(target=premium_collector,args=(stop,),daemon=True).start()
+  print('Fund Atlas: http://127.0.0.1:8765',flush=True)
+  try:ThreadingHTTPServer(('127.0.0.1',8765),Handler).serve_forever()
+  finally:stop.set()

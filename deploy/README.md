@@ -56,7 +56,7 @@ certbot certificates
 systemctl list-timers --all | grep certbot
 ```
 
-`/api/status` 中 `running: false` 表示当前没有刷新任务。网页刷新只检查共享缓存，到期才访问上游；单项失败有冷却。不要在服务运行时另起 `--refresh` 进程，同一运行目录有进程锁。
+`/api/status` 中 `running: false` 表示当前没有刷新任务。网页刷新只检查共享缓存，到期才访问上游；单项失败有冷却。`collector.enabled` 表示溢价定时采集已启用，`last_attempt`/`last_success`/`last_archived` 分别记录请求尝试、成功和有效样本落库时间；检查 `error` 和 `history_error` 可定位失败。不要在服务运行时另起 `--refresh` 进程，同一运行目录有进程锁。
 
 ## 数据和备份
 
@@ -65,3 +65,7 @@ systemctl list-timers --all | grep certbot
 备份时短暂停止服务，将 `/var/lib/fund-atlas` 完整备份到私有位置后再启动，确保 JSON 与 SQLite 一致；恢复同样先停止服务并恢复文件权限。运行数据、备份和 SSH 密钥不得提交仓库。原始响应位于 `evidence/`，应按磁盘容量定期检查。
 
 当前交易日历仅覆盖 2026 年，应在 2027 年前根据交易所公告更新；未知年份会阻止行情请求。接口无可用性保证，休市快照不保证等于官方收盘值。所有指标口径以根目录 README 为准。
+
+## 溢价定时采集
+
+服务模板的 `FUND_COLLECT_PREMIUM=1` 启用进程内采集，无须另加 cron。更新此功能必须重新安装 systemd 模板并执行 `systemctl daemon-reload`，再运行 release.sh；仅更新代码不会改变已有服务环境。历史在 `/var/lib/fund-atlas/premium-history.sqlite3`，与当前失败清空策略独立，备份应覆盖该文件。休市无自动上游请求；共享缓存到期才获取，手动任务持锁时跳过。关闭时将环境变量改为 0 并重启。
