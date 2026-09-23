@@ -91,6 +91,15 @@ class FieldUpdates(unittest.TestCase):
    server.SOURCE_CACHE.write('history:008971',{'error':'offline','value':performance(Metrics().series())})
    with patch.object(server,'DATA',path):result=server.nav_history('008971',3)
    self.assertEqual(result['points'],[])
+ def test_nav_history_30_days_uses_last_valuation_date(self):
+  with tempfile.TemporaryDirectory() as tmp:
+   path=pathlib.Path(tmp)/'data.json';path.write_text(json.dumps({'funds':[self.fund()]}))
+   points=[['2026-08-08',1.0,None,''],['2026-08-09',1.1,10,''],['2026-09-08',1.2,9.09,'']]
+   server.SOURCE_CACHE.write('history:008971',{'value':{'nav_date':'2026-09-08','nav_series':points},'checked_at':dt.datetime.now().timestamp()})
+   with patch.object(server,'DATA',path):result=server.nav_history('008971',days=30)
+   self.assertEqual(result['days'],30)
+   self.assertEqual([p[0] for p in result['points']],['2026-08-09','2026-09-08'])
+   with self.assertRaises(ValueError):server.nav_history('008971',days=31)
  def test_nav_history_uses_matching_legacy_evidence(self):
   with tempfile.TemporaryDirectory() as tmp:
    root=pathlib.Path(tmp);data_path=root/'data.json';data_path.write_text(json.dumps({'funds':[self.fund()]}))

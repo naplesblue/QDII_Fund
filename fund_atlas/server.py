@@ -83,13 +83,15 @@ def performance(s):
   out['periods'][str(years)]=[start.date().isoformat(),end.date().isoformat()]
  return out
 
-def nav_history(code,years):
+def nav_history(code,years=None,days=None):
  """Read one fund's daily NAV from successful shared history; never fetch upstream."""
- if not re.fullmatch(r'\d{6}',code) or years not in (1,3,5):raise ValueError('无效基金代码或区间')
+ if not re.fullmatch(r'\d{6}',code) or not ((years in (1,3,5) and days is None) or (years is None and days==30)):
+  raise ValueError('无效基金代码或区间')
+ period={'years':years} if years is not None else {'days':days}
  if not any(f['code']==code for f in load()['funds']):return None
  record=SOURCE_CACHE.read('history:'+code)
  if not record or record.get('error') or not isinstance(record.get('value'),dict):
-  return {'code':code,'years':years,'points':[],'reason':'历史净值尚未成功获取'}
+  return {'code':code,**period,'points':[],'reason':'历史净值尚未成功获取'}
  value=record['value'];series=value.get('nav_series')
  if series is None:
   # Pre-upgrade records contain only metrics. Reuse their matching evidence file if present.
@@ -102,12 +104,14 @@ def nav_history(code,years):
      if parsed.get('nav_date')==value.get('nav_date'):series=parsed['nav_series']
    except (ValueError,TypeError,KeyError):pass
  if not series:
-  return {'code':code,'years':years,'points':[],'as_of':value.get('nav_date'),'reason':'逐日净值尚未缓存；请在历史数据刷新后查看'}
+  return {'code':code,**period,'points':[],'as_of':value.get('nav_date'),'reason':'逐日净值尚未缓存；请在历史数据刷新后查看'}
  end=dt.date.fromisoformat(series[-1][0])
- try:start=end.replace(year=end.year-years)
- except ValueError:start=end.replace(year=end.year-years,day=28)
+ if days is not None:start=end-dt.timedelta(days=days)
+ else:
+  try:start=end.replace(year=end.year-years)
+  except ValueError:start=end.replace(year=end.year-years,day=28)
  points=[p for p in series if p[0]>=start.isoformat()]
- return {'code':code,'years':years,'points':points,'as_of':value.get('nav_date'),'checked_at':cache_stamp(record),'basis':'单位净值；分红/拆分前后未复权，不等同持有收益'}
+ return {'code':code,**period,'points':points,'as_of':value.get('nav_date'),'checked_at':cache_stamp(record),'basis':'单位净值；分红/拆分前后未复权，不等同持有收益'}
 
 def classify(target,scope,holdings):
  a=[x for x in holdings if re.fullmatch(r'(?:1\.(?:60|68)\d{4}|0\.(?:00|30)\d{4}|0\.92\d{4})',str(x))]
@@ -493,10 +497,10 @@ class Handler(SimpleHTTPRequestHandler):
  def do_GET(self):
   if urllib.parse.urlsplit(self.path).path=='/api/nav-history':
    params=urllib.parse.parse_qs(urllib.parse.urlsplit(self.path).query)
-   code=params.get('code',[''])[0];years=params.get('years',['3'])[0]
-   if not re.fullmatch(r'[0-9]{6}',code) or years not in ('1','3','5'):
+   code=params.get('code',[''])[0];days=params.get('days',[None])[0];years=params.get('years',[None if days else '3'])[0]
+   if not re.fullmatch(r'[0-9]{6}',code) or not ((days is None and years in ('1','3','5')) or (days=='30' and years is None)):
     return self.send_json({'error':'无效基金代码或区间'},400)
-   result=nav_history(code,int(years))
+   result=nav_history(code,int(years) if years else None,int(days) if days else None)
    return self.send_json(result,200) if result is not None else self.send_json({'error':'基金不在候选列表中'},404)
   if urllib.parse.urlsplit(self.path).path=='/api/premium-history':
    params=urllib.parse.parse_qs(urllib.parse.urlsplit(self.path).query)
