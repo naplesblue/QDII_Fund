@@ -10,6 +10,10 @@ class Metrics(unittest.TestCase):
  def test_returns_and_drawdown(self):
   p=performance(self.series());self.assertAlmostEqual(p['returns']['3'],14.47,places=1);self.assertEqual(p['drawdowns']['3'],-25);self.assertNotIn('5',p['returns'])
  def test_dividend_rejected(self): self.assertNotIn('3',performance(self.series('分红'))['returns'])
+ def test_nav_series_retains_dividend_even_when_return_rejected(self):
+  result=performance(self.series('分红'))
+  self.assertEqual(result['nav_series'][2],['2025-09-08',0.9,-25.0,'分红'])
+  self.assertNotIn('3',result['returns'])
  def test_mismatch_rejected(self): self.assertNotIn('3',performance(self.series().replace('25.0','20.0'))['returns'])
  def test_quota(self):
   rows=[[str(i).zfill(6),'测试','QDII','1','09-09','暂停申购','开放','','10','100','1','1','0.1%'] for i in range(100)]
@@ -72,6 +76,35 @@ class FieldUpdates(unittest.TestCase):
   with patch.object(server,'_fetch_latest_nav') as upstream:
    result=server.latest_nav('008971')
   upstream.assert_not_called();self.assertEqual(result['nav'],99);self.assertTrue(result['_cache']['cached'])
+ def test_nav_history_reads_shared_series_without_fetch(self):
+  with tempfile.TemporaryDirectory() as tmp:
+   path=pathlib.Path(tmp)/'data.json';path.write_text(json.dumps({'funds':[self.fund()]}))
+   data=performance(Metrics().series('分红'))
+   server.SOURCE_CACHE.write('history:008971',{'value':data,'checked_at':dt.datetime.now().timestamp()})
+   with patch.object(server,'DATA',path),patch.object(server,'fetch') as upstream:
+    result=server.nav_history('008971',3)
+   upstream.assert_not_called();self.assertEqual(result['points'][-1][0],'2026-09-08')
+   self.assertEqual(len(result['points']),4)
+ def test_nav_history_does_not_serve_failed_old_value(self):
+  with tempfile.TemporaryDirectory() as tmp:
+   path=pathlib.Path(tmp)/'data.json';path.write_text(json.dumps({'funds':[self.fund()]}))
+   server.SOURCE_CACHE.write('history:008971',{'error':'offline','value':performance(Metrics().series())})
+   with patch.object(server,'DATA',path):result=server.nav_history('008971',3)
+   self.assertEqual(result['points'],[])
+ def test_nav_history_uses_matching_legacy_evidence(self):
+  with tempfile.TemporaryDirectory() as tmp:
+   root=pathlib.Path(tmp);data_path=root/'data.json';data_path.write_text(json.dumps({'funds':[self.fund()]}))
+   evidence=root/'evidence';evidence.mkdir()
+   raw='var fS_code="008971";'+Metrics().series('分红')
+   (evidence/'008971-nav.js').write_text(raw)
+   server.SOURCE_CACHE.write('history:008971',{'value':{'nav_date':'2026-09-08'},'checked_at':dt.datetime.now().timestamp()})
+   with patch.object(server,'DATA',data_path),patch.object(server,'CACHE',evidence),patch.object(server,'fetch') as upstream:
+    result=server.nav_history('008971',1)
+   upstream.assert_not_called();self.assertEqual(result['points'][0][0],'2025-09-08')
+   (evidence/'008971-nav.js').write_text(raw.replace('008971','999999'))
+   with patch.object(server,'DATA',data_path),patch.object(server,'CACHE',evidence):
+    missing=server.nav_history('008971',1)
+   self.assertEqual(missing['points'],[])
  def test_legacy_failed_fields_removed(self):
   with tempfile.TemporaryDirectory() as tmp:
    path=pathlib.Path(tmp)/'data.json';f=self.fund();f['error']='old failure';path.write_text(json.dumps({'funds':[f]}))

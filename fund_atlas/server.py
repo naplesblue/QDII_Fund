@@ -46,11 +46,20 @@ def number(s):
 
 def performance(s):
  points=variable(s,'Data_netWorthTrend') or []
- points=[p for p in points if isinstance(p,dict) and number(p.get('x')) is not None and number(p.get('y')) is not None and p['y']>0]
+ points=[dict(p,x=number(p.get('x')),y=number(p.get('y'))) for p in points if isinstance(p,dict) and number(p.get('x')) is not None and number(p.get('y')) is not None and number(p.get('y'))>0]
  points.sort(key=lambda p:p['x'])
  if not points: return {'return_note':'暂无有效净值序列'}
  end=dt.datetime.fromtimestamp(points[-1]['x']/1000,TZ)
  out={'nav_date':end.date().isoformat(),'nav':points[-1]['y'],'returns':{},'drawdowns':{},'periods':{},'return_note':'净值法估算；仅展示窗口内无分红拆分且涨跌幅校验通过的数据。净值已计提持续费用。'}
+ # Keep exact daily unit NAV in the shared history record, never in the bulk fund snapshot.
+ cutoff=(end-dt.timedelta(days=5*366+15)).timestamp()*1000
+ series_by_date={}
+ for p in points:
+  if p['x']<cutoff:continue
+  day=dt.datetime.fromtimestamp(p['x']/1000,TZ).date().isoformat()
+  change=number(p.get('equityReturn'))
+  series_by_date[day]=[day,round(float(p['y']),6),round(change,2) if change is not None else None,str(p.get('unitMoney') or '')[:120]]
+ out['nav_series']=list(series_by_date.values())
  for years in [1,3,5]:
   try: target=end.replace(year=end.year-years)
   except ValueError: target=end.replace(year=end.year-years,day=28)
@@ -72,14 +81,33 @@ def performance(s):
    peak=max(peak,p['y']); dd=min(dd,(p['y']/peak-1)*100)
   out['drawdowns'][str(years)]=round(dd,2)
   out['periods'][str(years)]=[start.date().isoformat(),end.date().isoformat()]
- # Store small chart for 3y, with full-point drawdown above.
- cutoff=(end-dt.timedelta(days=3*365.25)).timestamp()*1000
- chart=[p for p in points if p['x']>=cutoff]
- if chart and '3' in out['returns']:
-  step=max(1,len(chart)//80); sample=chart[::step]
-  if sample[-1]!=chart[-1]: sample.append(chart[-1])
-  out['chart']=[[dt.datetime.fromtimestamp(p['x']/1000,TZ).date().isoformat(),round((p['y']/chart[0]['y']-1)*100,2)] for p in sample]
  return out
+
+def nav_history(code,years):
+ """Read one fund's daily NAV from successful shared history; never fetch upstream."""
+ if not re.fullmatch(r'\d{6}',code) or years not in (1,3,5):raise ValueError('无效基金代码或区间')
+ if not any(f['code']==code for f in load()['funds']):return None
+ record=SOURCE_CACHE.read('history:'+code)
+ if not record or record.get('error') or not isinstance(record.get('value'),dict):
+  return {'code':code,'years':years,'points':[],'reason':'历史净值尚未成功获取'}
+ value=record['value'];series=value.get('nav_series')
+ if series is None:
+  # Pre-upgrade records contain only metrics. Reuse their matching evidence file if present.
+  path=CACHE/(code+'-nav.js')
+  if path.exists():
+   try:
+    raw=path.read_text()
+    if variable(raw,'fS_code')==code:
+     parsed=performance(raw)
+     if parsed.get('nav_date')==value.get('nav_date'):series=parsed['nav_series']
+   except (ValueError,TypeError,KeyError):pass
+ if not series:
+  return {'code':code,'years':years,'points':[],'as_of':value.get('nav_date'),'reason':'逐日净值尚未缓存；请在历史数据刷新后查看'}
+ end=dt.date.fromisoformat(series[-1][0])
+ try:start=end.replace(year=end.year-years)
+ except ValueError:start=end.replace(year=end.year-years,day=28)
+ points=[p for p in series if p[0]>=start.isoformat()]
+ return {'code':code,'years':years,'points':points,'as_of':value.get('nav_date'),'checked_at':cache_stamp(record),'basis':'单位净值；分红/拆分前后未复权，不等同持有收益'}
 
 def classify(target,scope,holdings):
  a=[x for x in holdings if re.fullmatch(r'(?:1\.(?:60|68)\d{4}|0\.(?:00|30)\d{4}|0\.92\d{4})',str(x))]
@@ -195,7 +223,6 @@ def apply_history(f,h,fields):
  for field in fields:
   if field=='returns':
    f.update(returns=h['returns'],periods=h['periods'],return_note=h['return_note'],returns_date=h['nav_date'],returns_at=cache_stamp(h['_cache']) if h.get('_cache') else now())
-   if h.get('chart'): f['chart']=h['chart']
   elif field=='drawdowns': f.update(drawdowns=h['drawdowns'],drawdown_periods=h['periods'],drawdowns_date=h['nav_date'],drawdowns_at=cache_stamp(h['_cache']) if h.get('_cache') else now())
   finish(f,field,'年限不足或分红 / 复权未通过校验')
   if h.get('_cache'):mark_source(f,field,h['_cache'])
@@ -464,6 +491,13 @@ class Handler(SimpleHTTPRequestHandler):
  def send_json(self,x,status=200):
   body=json.dumps(x,ensure_ascii=False).encode();self.send_response(status);self.send_header('Content-Type','application/json; charset=utf-8');self.send_header('Cache-Control','no-store');self.end_headers();self.wfile.write(body)
  def do_GET(self):
+  if urllib.parse.urlsplit(self.path).path=='/api/nav-history':
+   params=urllib.parse.parse_qs(urllib.parse.urlsplit(self.path).query)
+   code=params.get('code',[''])[0];years=params.get('years',['3'])[0]
+   if not re.fullmatch(r'[0-9]{6}',code) or years not in ('1','3','5'):
+    return self.send_json({'error':'无效基金代码或区间'},400)
+   result=nav_history(code,int(years))
+   return self.send_json(result,200) if result is not None else self.send_json({'error':'基金不在候选列表中'},404)
   if urllib.parse.urlsplit(self.path).path=='/api/premium-history':
    params=urllib.parse.parse_qs(urllib.parse.urlsplit(self.path).query)
    code=params.get('code',[''])[0];days=params.get('days',['30'])[0]
