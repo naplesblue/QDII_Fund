@@ -41,8 +41,8 @@
  document.addEventListener('mouseout',e=>{if(!e.target.closest('[data-premium-history]'))return;clearTimeout(openTimer);if(!pinned)closeTimer=setTimeout(close,250);});
  panel.addEventListener('mouseenter',()=>clearTimeout(closeTimer));
  panel.addEventListener('mouseleave',()=>{if(!pinned)closeTimer=setTimeout(close,250);});
- document.addEventListener('click',e=>{const button=e.target.closest('[data-premium-history]');if(button){open(button,true);return;}if(!panel.contains(e.target))close();});
- document.addEventListener('keydown',e=>{if(e.key==='Escape'&&!panel.hidden){const previous=anchor;close();previous?.focus();close();}});
+ document.addEventListener('click',e=>{const button=e.target.closest('[data-premium-history]');if(button){open(button,true);return;}if(!e.composedPath().includes(panel))close();});
+ document.addEventListener('keydown',e=>{if(e.key==='Escape'&&!panel.hidden){const previous=anchor;close();previous?.focus();}});
  panel.addEventListener('click',e=>{if(e.target.closest('[data-history-close]')){close();return;}const period=e.target.closest('[data-history-days]');if(period){days=Number(period.dataset.historyDays);pinned=true;render();}if(e.target.closest('[data-history-retry]'))render();});
  window.addEventListener('resize',position);window.addEventListener('scroll',()=>{if(!panel.hidden)position();},true);
 })();
