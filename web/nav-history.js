@@ -13,7 +13,7 @@
   const data=await response.json();cache.set(key,{data,loaded:Date.now()});return data;
  }
  function controls(period){return `<div class="nav-periods" role="group" aria-label="净值区间">${[['30d','30 天'],['1y','1 年'],['3y','3 年'],['5y','5 年']].map(([key,label])=>`<button type="button" data-nav-range="${key}" aria-pressed="${key===period}">${label}</button>`).join('')}</div>`;}
- function inspect(p){return `<strong>${escape(p[0])}</strong><span>单位净值 <b>${Number(p[1]).toFixed(4)}</b></span><span>来源日涨跌 <b>${percent(p[2])}</b></span>${p[3]?`<em>分红 / 拆分标记：${escape(p[3])}</em>`:''}`;}
+ function inspect(p){return `<strong>${escape(p[0])}</strong><span>单位净值 <b>${Number(p[1]).toFixed(4)}</b></span><span>当日净值涨跌（来源披露） <b>${percent(p[2])}</b></span>${p[3]?`<em>分红 / 拆分标记：${escape(p[3])}</em>`:''}`;}
  function draw(target,raw,large){
   const points=raw.filter(p=>Array.isArray(p)&&/^\d{4}-\d{2}-\d{2}$/.test(p[0])&&Number.isFinite(Number(p[1]))&&Number(p[1])>0).map(p=>[p[0],Number(p[1]),p[2]==null?null:Number(p[2]),String(p[3]||'')]);
   if(!points.length){target.textContent='所选区间暂无逐日净值。历史来源缓存刷新后可再查看。';return;}
@@ -50,7 +50,7 @@
    draw(target,data.points,large);target.insertAdjacentHTML('beforeend',`<p class="nav-basis">${escape(data.basis||'单位净值')} · 历史截止 ${escape(data.as_of||'未知')}；单位净值遇分红 / 拆分会跳变，不代表实际亏损或总回报。</p>`);
   }catch{if(target.isConnected)target.innerHTML='历史读取失败。<button type="button" data-nav-retry>重新读取</button>';}
  }
- function renderPanel(){panel.innerHTML=`<div class="nav-popover-head"><strong>${code} · 历史单位净值</strong><button type="button" data-nav-close aria-label="关闭净值历史">×</button></div>${controls(range)}<div class="nav-chart-body"></div><p class="nav-help">悬停图线查看估值日和来源日涨跌。点击净值可固定小窗。</p>`;panel.hidden=false;position();fill(panel.querySelector('.nav-chart-body'),code,range,false).finally(position);}
+ function renderPanel(){panel.innerHTML=`<div class="nav-popover-head"><strong>${code} · 历史单位净值</strong><button type="button" data-nav-close aria-label="关闭净值历史">×</button></div>${controls(range)}<div class="nav-chart-body"></div><p class="nav-help">悬停图线查看估值日和来源披露的当日净值涨跌。点击净值可固定小窗。</p>`;panel.hidden=false;position();fill(panel.querySelector('.nav-chart-body'),code,range,false).finally(position);}
  function open(button,pin=false){clearTimeout(openTimer);clearTimeout(closeTimer);anchor=button;const host=button.closest('dialog')||document.body;if(panel.parentNode!==host)host.append(panel);code=button.dataset.navHistory;pinned=pin;renderPanel();}
  function mountDetail(fund,period){const section=document.querySelector(`[data-nav-detail="${fund}"]`);if(!section)return;
   const selected=/^(30d|[135]y)$/.test(String(period))?String(period):`${period}y`;
