@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Local read-only fund screener. Run python3 -m fund_atlas; background collection or --refresh."""
+import gzip
 import concurrent.futures, csv, io, os, datetime as dt, html, json, math, pathlib, re, subprocess, threading, time, urllib.parse
 from http.server import ThreadingHTTPServer, SimpleHTTPRequestHandler
 from .premium_history import PremiumHistory
@@ -510,7 +511,14 @@ class Handler(SimpleHTTPRequestHandler):
  def __init__(self,*a,**k): super().__init__(*a,directory=str(ROOT/'web'),**k)
  def log_message(self,*a): pass
  def send_json(self,x,status=200):
-  body=json.dumps(x,ensure_ascii=False).encode();self.send_response(status);self.send_header('Content-Type','application/json; charset=utf-8');self.send_header('Cache-Control','no-store');self.end_headers();self.wfile.write(body)
+  body=json.dumps(x,ensure_ascii=False,separators=(',',':')).encode()
+  encodings=[part.strip().lower() for part in self.headers.get('Accept-Encoding','').split(',')]
+  compressed=len(body)>1024 and 'gzip' in encodings
+  if compressed:body=gzip.compress(body,compresslevel=1)
+  self.send_response(status);self.send_header('Content-Type','application/json; charset=utf-8');self.send_header('Cache-Control','no-store')
+  self.send_header('Vary','Accept-Encoding');self.send_header('Content-Length',str(len(body)))
+  if compressed:self.send_header('Content-Encoding','gzip')
+  self.end_headers();self.wfile.write(body)
  def do_GET(self):
   if urllib.parse.urlsplit(self.path).path=='/api/nav-history':
    params=urllib.parse.parse_qs(urllib.parse.urlsplit(self.path).query)
