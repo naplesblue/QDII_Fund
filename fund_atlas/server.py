@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Local read-only fund screener. Run python3 -m fund_atlas; refresh via UI or --refresh."""
+"""Local read-only fund screener. Run python3 -m fund_atlas; background collection or --refresh."""
 import concurrent.futures, csv, io, os, datetime as dt, html, json, math, pathlib, re, subprocess, threading, time, urllib.parse
 from http.server import ThreadingHTTPServer, SimpleHTTPRequestHandler
 from .premium_history import PremiumHistory
@@ -14,6 +14,7 @@ SOURCE_CACHE=SharedCache(RUNTIME/'cache')
 PREMIUM_HISTORY=PremiumHistory(RUNTIME/'premium-history.sqlite3')
 COLLECTOR={'enabled':os.environ.get('FUND_COLLECT_PREMIUM')=='1','last_attempt':None,'last_success':None,'error':None,'last_archived':None,'history_error':None}
 ALLOWED_ORIGINS=set(os.environ.get('FUND_ALLOWED_ORIGINS','http://127.0.0.1:8765,http://localhost:8765').split(','))
+UPDATER={'enabled':os.environ.get('FUND_AUTO_REFRESH')=='1','interval_seconds':1800,'last_attempt':None,'last_completed':None,'next_check':None,'error':None}
 LOCK=threading.Lock()
 STATUS={'running':False,'done':0,'total':0,'errors':0,'message':'尚未刷新'}
 TZ=dt.timezone(dt.timedelta(hours=8))
@@ -441,6 +442,22 @@ def refresh(limit=None):
  finally:STATUS['running']=False;LOCK.release()
  return True
 
+def data_updater(stop):
+ # Start immediately; schedule from completion so slow rounds never overlap.
+ while not stop.is_set():
+  delay=30
+  try:
+   UPDATER.update(last_attempt=now(),next_check=None)
+   if refresh():
+    failed=STATUS['message'].startswith('刷新中断')
+    UPDATER.update(last_completed=None if failed else now(),error=STATUS['message'] if failed else None)
+    delay=UPDATER['interval_seconds']
+  except Exception as error:
+   UPDATER['error']=str(error)
+   delay=300
+  UPDATER['next_check']=(dt.datetime.now(TZ)+dt.timedelta(seconds=delay)).isoformat(timespec='seconds')
+  stop.wait(delay)
+
 def retry(code,field):
  if field not in FIELDS or not re.fullmatch(r'\d{6}',code):return {'error':'无效基金代码或数据项'},400
  if not LOCK.acquire(False):return {'joined':True,'message':'已有共享刷新任务，正在等待其结果'},202
@@ -517,7 +534,7 @@ class Handler(SimpleHTTPRequestHandler):
     values=[f['code'],f['name'],f['currency'],f['category'],f.get('classification_note'),f.get('returns',{}).get(years),f.get('drawdowns',{}).get(years),f.get('nav'),f.get('nav_date'),CHANNEL_LABELS[classify_channel(f)],f.get('purchase_status'),f.get('quota'),f.get('purchase_fee'),*[f.get('fees',{}).get(k) for k in ['management','custody','service']],f.get('premium'),f.get('quote_date'),f.get('purchase_at'),f.get('returns_at'),json.dumps(f.get('field_states',{}),ensure_ascii=False)]
     w.writerow([("'"+v if isinstance(v,str) and v.startswith(('=','+','-','@')) else v) for v in values])
    body=('\ufeff'+out.getvalue()).encode('utf-8');self.send_response(200);self.send_header('Content-Type','text/csv; charset=utf-8');self.send_header('Content-Disposition','attachment; filename="fund-atlas.csv"');self.send_header('Content-Length',str(len(body)));self.end_headers();self.wfile.write(body);return
-  if self.path=='/api/status': return self.send_json(dict(STATUS,collector=COLLECTOR.copy()))
+  if self.path=='/api/status': return self.send_json(dict(STATUS,collector=COLLECTOR.copy(),updater=UPDATER.copy()))
   if self.path in ('/api/data','/data.json'): return self.send_json(load())
   return super().do_GET()
  def do_POST(self):
@@ -532,9 +549,8 @@ class Handler(SimpleHTTPRequestHandler):
     if not isinstance(code,str) or not isinstance(field,str):raise ValueError()
    except (ValueError,AttributeError):return self.send_json({'error':'无效请求'},400)
    result,status=retry(code,field);return self.send_json(result,status)
-  if LOCK.locked():return self.send_json({'accepted':True,'joined':True},202)
-  threading.Thread(target=refresh,daemon=True).start()
-  self.send_json({'accepted':True},202)
+  # Compatibility for older browser tabs: refresh now only reads the snapshot.
+  self.send_json({'snapshot_only':True,'running':STATUS['running']})
 def main():
  import argparse
  p=argparse.ArgumentParser();p.add_argument('--refresh',action='store_true');p.add_argument('--limit',type=int); args=p.parse_args()
@@ -547,6 +563,7 @@ def main():
   refresh(args.limit);print(json.dumps(STATUS,ensure_ascii=False))
  else:
   stop=threading.Event()
+  if UPDATER['enabled']:threading.Thread(target=data_updater,args=(stop,),daemon=True).start()
   if COLLECTOR['enabled']:threading.Thread(target=premium_collector,args=(stop,),daemon=True).start()
   print('Fund Atlas: http://127.0.0.1:8765',flush=True)
   try:ThreadingHTTPServer(('127.0.0.1',8765),Handler).serve_forever()
